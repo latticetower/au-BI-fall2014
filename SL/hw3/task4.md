@@ -8,6 +8,7 @@ Hint: Можно расковырять оригинальную функцию 
 ```r
 library(MASS)
 library(e1071)
+library(rmarkdown)
 ```
 
 
@@ -24,21 +25,21 @@ stepCV(l, trace = TRUE)
 ```
 
 ```
-## Start:  CV.performance=64.32
+## Start:  CV.performance=63.66
 ## y ~ trt + base + age + V4 + subject + period + lbase + lage
 ## 
 ##                  Df rank      CV
-## - base    -40.80114    8 103.797
-## - lbase    -5.87600    8  68.872
-## - subject  -1.12091    8  64.117
-## <none>                 9  62.996
-## - V4        0.21232    8  62.783
-## - lage      0.86694    8  62.129
-## - age       1.00570    8  61.990
-## - trt       1.36480    8  61.631
-## - period    2.90006    8  60.096
+## - base    -39.18450    8 101.209
+## - lbase    -6.23835    8  68.263
+## - trt      -2.36605    8  64.390
+## - age      -1.52162    8  63.546
+## - subject  -1.46885    8  63.493
+## - lage     -0.38521    8  62.409
+## - V4       -0.22703    8  62.251
+## <none>                 9  62.024
+## - period    0.39664    8  61.628
 ## 
-## Step:  CV.performance=105.16
+## Step:  CV.performance=103.45
 ## y ~ trt + age + V4 + subject + period + lbase + lage
 ```
 

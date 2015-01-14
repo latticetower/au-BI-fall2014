@@ -7,9 +7,10 @@ Hint: Можно расковырять оригинальную функцию 
 ```{r}
 library(MASS)
 library(e1071)
+library(rmarkdown)
 ```
 
-```{r}
+```{r results='asis'}
 source("stepCV.R")
 ```
 
