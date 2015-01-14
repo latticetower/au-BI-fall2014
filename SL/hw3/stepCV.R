@@ -1,3 +1,106 @@
+# from file MASS/R/add.R
+# dropterm method redefined
+addterm2 <-
+  function(object, ...) UseMethod("addterm2")
+
+addterm2.default <-
+  function(object, scope, scale = 0, test = c("none"),
+           k = 2, sorted = FALSE, trace = FALSE, ...)
+  {
+    if(missing(scope) || is.null(scope)) stop("no terms in scope")
+    if(!is.character(scope))
+      scope <- add.scope(object, update.formula(object, scope))
+    if(!length(scope))
+      stop("no terms in scope for adding to object")
+    #     newform <- update.formula(object,
+    #                               paste(". ~ . +", paste(scope, collapse="+")))
+    #     data <- model.frame(update(object, newform)) # remove NAs
+    #     object <- update(object, data = data)
+    ns <- length(scope)
+    ans <- matrix(nrow = ns + 1L, ncol = 2L,
+                  dimnames = list(c("<none>", scope), c("rank", "performance")))
+    ans[1L,  ] <- extractCV(object, scale, k = k, ...)
+    n0 <- nobs(object, use.fallback = TRUE)
+    env <- environment(formula(object))
+    for(i in seq_len(ns)) {
+      tt <- scope[i]
+      if(trace) {
+        message(gettextf("trying + %s", tt), domain = NA)
+        utils::flush.console()
+      }
+      nfit <- update(object, as.formula(paste("~ . +", tt)),
+                     evaluate = FALSE)
+      nfit <- try(eval(nfit, envir = env), silent = TRUE)
+      ans[i + 1L, ] <- if (!inherits(nfit, "try-error")) {
+        nnew <- nobs(nfit, use.fallback = TRUE)
+        if (all(is.finite(c(n0, nnew))) && nnew != n0)
+          stop("number of rows in use has changed: remove missing values?")
+        extractCV(nfit, scale, k = k, ...)
+      } else NA_real_
+    }
+    dfs <- ans[, 1L] - ans[1L, 1L]
+    dfs[1L] <- NA
+    aod <- data.frame(Df = dfs, AIC = ans[, 2L])
+    o <- if(sorted) order(aod$AIC) else seq_along(aod$AIC)
+    #test <- match.arg(test)
+    aod <- aod[o, ]
+    head <- c("Single term additions", "\nModel:", deparse(formula(object)))
+    if(scale > 0)
+      head <- c(head, paste("\nscale: ", format(scale), "\n"))
+    class(aod) <- c("anova", "data.frame")
+    attr(aod, "heading") <- head
+    aod
+  }
+
+dropterm2 <- function(object, ...) UseMethod("dropterm2")
+
+dropterm2.default <-
+  function(object, scope, scale = 0, test = c("none"),
+           k = 2, sorted = FALSE, trace = FALSE, ...)
+  {
+    tl <- attr(terms(object), "term.labels")
+    if(missing(scope)) scope <- drop.scope(object)
+    else {
+      if(!is.character(scope))
+        scope <- attr(terms(update.formula(object, scope)), "term.labels")
+      if(!all(match(scope, tl, 0L)))
+        stop("scope is not a subset of term labels")
+    }
+    ns <- length(scope)
+    ans <- matrix(nrow = ns + 1L, ncol = 2L,
+                  dimnames =  list(c("<none>", scope), c("rank", "performance")))
+    
+    ans[1,  ] <- extractCV(object, scale, k = k, ...)
+    n0 <- nobs(object, use.fallback = TRUE)
+    env <- environment(formula(object))
+    for(i in seq_len(ns)) {
+      tt <- scope[i]
+      if(trace) {
+        message(gettextf("trying - %s", tt), domain = NA)
+        utils::flush.console()
+      }
+      nfit <- update(object, as.formula(paste("~ . -", tt)),
+                     evaluate = FALSE)
+      nfit <- eval(nfit, envir=env) # was  eval.parent(nfit)
+      ans[i+1, ] <- extractCV(nfit, scale, k = k, ...)
+      nnew <- nobs(nfit, use.fallback = TRUE)
+      if(all(is.finite(c(n0, nnew))) && nnew != n0)
+        stop("number of rows in use has changed: remove missing values?")
+    }
+    dfs <- ans[1L , 2L] - ans[, 2L]
+    dfs[1L] <- NA
+    aod <- data.frame(Df = dfs, rank=ans[, 1], CV = ans[,2])
+    o <- if(sorted) order(aod$CV) else seq_along(aod$CV)
+    test <- match.arg(test)
+    aod <- aod[o, ]
+    head <- c("Single term deletions", "\nModel:", deparse(formula(object)))
+    if(scale > 0)
+      head <- c(head, paste("\nscale: ", format(scale), "\n"))
+    class(aod) <- c("anova", "data.frame")
+
+    attr(aod, "heading") <- head
+    aod
+  }
 # file MASS/R/stepAIC.R
 # copyright (C) 1994-2007 W. N. Venables and B. D. Ripley
 #
@@ -14,7 +117,7 @@
 #  A copy of the GNU General Public License is available at
 #  http://www.r-project.org/Licenses/
 #
-stepAIC <-
+stepCV <-
   function(object, scope, scale = 0,
            direction = c("both", "backward", "forward"),
            trace = 1, keep = NULL, steps = 1000, use.start = FALSE, k = 2, ...)
@@ -22,7 +125,7 @@ stepAIC <-
     mydeviance <- function(x, ...)
     {
         dev <- deviance(x)
-        if(!is.null(dev)) dev else extractAIC(x, k=0)[2L]
+        if(!is.null(dev)) dev else extractCV(x, k=0)[2L]
     }
 
     cut.string <- function(string)
@@ -44,23 +147,20 @@ stepAIC <-
     step.results <- function(models, fit, object, usingCp=FALSE)
     {
         change <- sapply(models, "[[", "change")
-        rd <- sapply(models, "[[", "deviance")
-        dd <- c(NA, abs(diff(rd)))
-        rdf <- sapply(models, "[[", "df.resid")
-        ddf <- c(NA, abs(diff(rdf)))
-        AIC <- sapply(models, "[[", "AIC")
+        rank <- sapply(models, "[[", "rank")
+        performance <- sapply(models, "[[", "performance")
+        ddf <- c(NA, abs(diff(performance)))
+        CV <- sapply(models, "[[", "CV")
         heading <- c("Stepwise Model Path \nAnalysis of Deviance Table",
                      "\nInitial Model:", deparse(formula(object)),
                      "\nFinal Model:", deparse(formula(fit)),
                      "\n")
         aod <-
             if(usingCp)
-                data.frame(Step = change, Df = ddf, Deviance = dd,
-                           "Resid. Df" = rdf, "Resid. Dev" = rd,
-                           Cp = AIC, check.names = FALSE)
-            else data.frame(Step = change, Df = ddf, Deviance = dd,
-                            "Resid. Df" = rdf, "Resid. Dev" = rd,
-                            AIC = AIC, check.names = FALSE)
+                data.frame(Step = change, performance = performance, rank = rank,
+                           Cp = CV, check.names = FALSE)
+            else data.frame(Step = change, performance = performance, rank = rank,
+                            CV = CV, check.names = FALSE)
         attr(aod, "heading") <- heading
         class(aod) <- c("Anova", "data.frame")
         fit$anova <- aod
@@ -78,7 +178,7 @@ stepAIC <-
     backward <- direction == "both" | direction == "backward"
     forward <- direction == "both" | direction == "forward"
     if(missing(scope)) {
-	fdrop <- numeric()
+	      fdrop <- numeric()
         fadd <- attr(Terms, "factors")
         if(md) forward <- FALSE
     } else {
@@ -98,27 +198,26 @@ stepAIC <-
     if(!is.null(keep)) keep.list <- vector("list", steps)
     n <- nobs(object, use.fallback = TRUE)  # might be NA
     fit <- object
-    bAIC <- extractAIC(fit, scale, k = k, ...)
-    edf <- bAIC[1L]
-    bAIC <- bAIC[2L]
-    if(is.na(bAIC))
-        stop("AIC is not defined for this model, so 'stepAIC' cannot proceed")
-    if(bAIC == -Inf)
-        stop("AIC is -infinity for this model, so 'stepAIC' cannot proceed")
+    resCV <- extractCV(fit, scale, k = k, ...)
+	  rank <- resCV[1L]
+	  performance <- resCV[2L]
+    if(is.na(performance))
+        stop("performance is not defined for this model, so 'stepCV' cannot proceed")
+    if(performance == -Inf)
+        stop("performance is -infinity for this model, so 'stepCV' cannot proceed")
    nm <- 1
     Terms <- terms(fit)
     if(trace) {
-        cat("Start:  AIC=", format(round(bAIC, 2)), "\n",
+        cat("Start:  CV.performance=", format(round(performance, 2)), "\n",
             cut.string(deparse(formula(fit))), "\n\n", sep='')
 	utils::flush.console()
     }
-    models[[nm]] <- list(deviance = mydeviance(fit), df.resid = n - edf,
-                         change = "", AIC = bAIC)
-    if(!is.null(keep)) keep.list[[nm]] <- keep(fit, bAIC)
+	  models[[nm]] <- list(rank = rank, change = "", performance = performance, CV=performance)
+    if(!is.null(keep)) keep.list[[nm]] <- keep(fit, performance)
     usingCp <- FALSE
     while(steps > 0) {
         steps <- steps - 1
-        AIC <- bAIC
+        CV <- performance
         ffac <- attr(Terms, "factors")
         ## don't drop strata terms
         if(!is.null(sp <- attr(Terms, "specials")) &&
@@ -127,18 +226,18 @@ stepAIC <-
         aod <- NULL
         change <- NULL
         if(backward && length(scope$drop)) {
-            aod <- dropterm(fit, scope$drop, scale = scale,
+            aod <- dropterm2(fit, scope$drop, scale = scale,
                             trace = max(0, trace - 1), k = k, ...)
             rn <- row.names(aod)
             row.names(aod) <- c(rn[1L], paste("-", rn[-1L], sep=" "))
             ## drop all zero df terms first.
             if(any(aod$Df == 0, na.rm=TRUE)) {
                 zdf <- aod$Df == 0 & !is.na(aod$Df)
-                nc <- match(c("Cp", "AIC"), names(aod))
+                nc <- match(c("Cp", "CV"), names(aod))
                 nc <- nc[!is.na(nc)][1L]
                 ch <- abs(aod[zdf, nc] - aod[1, nc]) > 0.01
                 if(any(is.finite(ch) & ch)) {
-                    warning("0 df terms are changing AIC")
+                    warning("0 df terms are changing CV")
                     zdf <- zdf[!ch]
                 }
                 ## drop zero df terms first: one at time since they
@@ -149,7 +248,7 @@ stepAIC <-
         }
         if(is.null(change)) {
             if(forward && length(scope$add)) {
-                aodf <- addterm(fit, scope$add, scale = scale,
+                aodf <- addterm2(fit, scope$add, scale = scale,
                                 trace = max(0, trace - 1), k = k, ...)
                 rn <- row.names(aodf)
                 row.names(aodf) <- c(rn[1L], paste("+", rn[-1L], sep=" "))
@@ -163,13 +262,13 @@ stepAIC <-
             nzdf <- if(!is.null(aod$Df)) aod$Df != 0 | is.na(aod$Df)
             aod <- aod[nzdf, ]
             if(is.null(aod) || ncol(aod) == 0) break
-            nc <- match(c("Cp", "AIC"), names(aod))
+            nc <- match(c("Cp", "CV"), names(aod))
             nc <- nc[!is.na(nc)][1L]
-            o <- order(aod[, nc])
+            o <- order(aod[, nc], decreasing =TRUE)
             if(trace) {
-		print(aod[o,  ])
-		utils::flush.console()
-	    }
+          		print(aod[o,  ])
+          		utils::flush.console()
+          	    }
             if(o[1L] == 1) break
             change <- rownames(aod)[o[1L]]
         }
@@ -181,46 +280,34 @@ stepAIC <-
         if(all(is.finite(c(n, nnew))) && nnew != n)
             stop("number of rows in use has changed: remove missing values?")
         Terms <- terms(fit)
-        bAIC <- extractAIC(fit, scale, k = k, ...)
-        edf <- bAIC[1L]
-        bAIC <- bAIC[2L]
+        resCV <- extractCV(fit, scale, k = k, ...)# was bAIC
+        #edf <- bAIC[1L]
+        #bAIC <- bAIC[2L]
+        rank <- resCV[1L]
+        performance <- resCV[2L]
         if(trace) {
-            cat("\nStep:  AIC=", format(round(bAIC, 2)), "\n",
+            cat("\nStep:  CV.performance=", format(round(performance, 2)), "\n",
                 cut.string(deparse(formula(fit))), "\n\n", sep='')
 	    utils::flush.console()
 	}
         ## add a tolerance as dropping 0-df terms might increase AIC slightly
-        if(bAIC >= AIC + 1e-7) break
+        if(performance >= CV + 1e-7) break
         nm <- nm + 1
         models[[nm]] <-
-            list(deviance = mydeviance(fit), df.resid = n - edf,
-                 change = change, AIC = bAIC)
-        if(!is.null(keep)) keep.list[[nm]] <- keep(fit, bAIC)
+            list(rank = rank, performance=performance,
+                 change = change, CV = performance)
+        if(!is.null(keep)) keep.list[[nm]] <- keep(fit, performance)
     }
     if(!is.null(keep)) fit$keep <- re.arrange(keep.list[seq(nm)])
     step.results(models = models[seq(nm)], fit, object, usingCp)
 }
 
-extractAIC.loglm <- function(fit, scale, k = 2, ...)
-{
-    edf <- fit$n - fit$df
-    c(edf,  fit$deviance + k * edf)
-}
+extractCV <- function(object, ...) UseMethod("extractCV")
 
-extractAIC.lme <- function(fit, scale, k = 2, ...)
+extractCV.lm <- function(fit, scale, k = 2, ...)
 {
-    if(fit$method != "ML") stop("AIC undefined for REML fit")
-    res <- logLik(fit)
-    edf <- attr(res, "df")
-    c(edf,  -2*res + k * edf)
-}
-
-extractAIC.gls <- function(fit, scale, k = 2, ...)
-{
-    if(fit$method != "ML") stop("AIC undefined for REML fit")
-    res <- logLik(fit)
-    edf <- attr(res, "df")
-    c(edf,  -2*res + k * edf)
+  t <- tune(lm, formula(fit$terms), data = fit$model)
+  c(t$best.model$rank, t$best.performance)
 }
 
 terms.gls <- terms.lme <- function(x, ...) terms(formula(x), ...)
