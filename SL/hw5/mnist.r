@@ -47,10 +47,7 @@ save_image_file <- function(filename, data, n, ncol, nrow) {
   writeBin(n, f, endian='big', size=4)
   writeBin(nrow, f, endian='big', size=4)
   writeBin(ncol, f, endian='big', size=4)
-  print(as.vector(matrix(t(data[, -1]), nrow = 1, byrow=T)))
   x = writeBin(as.vector(matrix(t(data[, -1]), nrow = 1)[1, ]),f, size=1)
-
-  #ret$x = matrix(x, ncol=nrow*ncol, byrow=T)
   close(f)
 }
 
@@ -58,7 +55,7 @@ save_label_file <- function(filename, n, v) {
   f = file(filename,'wb')
   writeBin(2, f,size=4,endian='big')
   writeBin(n, f,size=4,endian='big')
-  print(as.vector(v))
+  #print(as.vector(v))
   writeBin(as.integer(as.vector(v)), f,size=1)
   close(f)
 }
