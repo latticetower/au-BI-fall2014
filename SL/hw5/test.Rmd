@@ -6,33 +6,109 @@ library(raster)
 source("PCA/PCAfncs.R")
 source("mnist.r") # http://yann.lecun.com/exdb/mnist/
 load_mnist()
-train<- mnist.train[1:10000, ]
+train<- mnist.train[1:100, ]
 mnist.train <- train
 test <- mnist.test[1:1000, ]
 mnist.test <- test
 
+library(data.table)
+nrecords<-nrow(mnist.train)
+borders <- data.table(colmin = rep(0, nrecords), 
+                      colmax = rep(28, nrecords), 
+                      rowmin = rep(0, nrecords), 
+                      rowmax = rep(28, nrecords))
+newtrain <- data.table(y = rep(0, nrecords), x = matrix(rep(1:400, nrecords), nrow=nrecords))
 
-#check.borders = function(digit) {
-#  print(digit)
-#  for (i in 1:nrow(digit)) {
-#    colmin <- 0
-#    colmax <- ncol(digit)
-#    while (colmin < colman)
-#  }
-#  for(j in 1: ncol(digit)) {
-#      
-#  }
-#} 
 
-#trim.dataset = function(dataset) {
-#  for (i in 1: nrow(dataset)) {
-#    check_borders(matrix(dataset[i, -1], ncol = 28)
-#  }
-#  sds = matrix(sapply(dataset, sd)[-1], ncol=28)
-#  print(sds)
-#}
-#trim.dataset(train)
+check.borders <- function(j, digit, borders) {
+  c<-colSums(digit)
+  colmin <- 0
+  colmax <- ncol(digit)  
+  for (i in 1:ncol(digit)) {
+    if (c[i]>0) break
+    colmin<- i
+  }
+  for (i in ncol(digit):1) {
+    colmax <- i
+    if (c[i]>0) break
+  }
+  r <- rowSums(digit)
+  rowmin <- 0
+  rowmax <- nrow(digit)  
+  for (i in 1:nrow(digit)) {
+    if (r[i]>0) break
+    rowmin<- i
+  }
+  for (i in nrow(digit):1) {
+    rowmax <- i
+    if (r[i]>0) break
+  }
+  set(borders, as.integer(j), 1, colmin)
+  set(borders, as.integer(j), 2, colmax)
+  set(borders, as.integer(j), 3, rowmin)
+  set(borders, as.integer(j), 4, rowmax)
+} 
 
+resize.matrix <- function(dataset, i, digit, maxwidth, maxheight, digit.borders, newtrain) {
+  temp.matrix <- matrix(0, nrow =maxheight, ncol=maxwidth)
+  offsetx <- 0
+  offsety <- 0
+  if (digit.borders$colmax - digit.borders$colmin <maxwidth) {
+    offsetx <- (maxwidth - (digit.borders$colmax - digit.borders$colmin)) %/% 2
+  }
+  if (digit.borders$rowmax - digit.borders$rowmin <maxheight) {
+    offsety <- (maxheight - (digit.borders$rowmax - digit.borders$rowmin)) %/% 2
+  }
+  colmin <- digit.borders$colmin + 1
+  
+  colmax <- digit.borders$colmin + maxwidth
+  #print(colmax - colmin)
+  if (colmax > ncol(digit)) {
+    colmax <- ncol(digit)
+    colmin <- colmax - maxwidth + 1
+  }
+  rowmin <- digit.borders$rowmin + 1
+  rowmax <- digit.borders$rowmin + maxheight
+  if (rowmax > nrow(digit)) {
+    rowmax <- nrow(digit)
+    rowmin <- rowmax - maxheight + 1
+  }
+  
+  set(newtrain, as.integer(i), 1, dataset[i, 1])
+  newdigit<-matrix(t(digit[rowmin:rowmax, colmin:colmax]), nrow=1, byrow=T)
+  #print(ncol(newdigit))
+  #print(nrow(newdigit))
+  for (j in 1: ncol(newdigit)) {
+    #print(j)
+    set(newtrain, as.integer(i), as.integer(j+1), newdigit[j])
+  }
+  
+}
+trim.dataset <- function(dataset, borders, newtrain) {
+  for (i in 1: nrow(dataset)) {
+    #print("p2")
+    #print(i)
+    check.borders(i, matrix(t(dataset[i, -1]), nrow = 28), borders)
+  }
+  #sds = matrix(sapply(dataset, sd)[-1], ncol=28)
+  maxwidth <<- max(borders$colmax-borders$colmin)
+  maxheight <<- max(borders$rowmax-borders$rowmin)
+  #print(maxwidth)
+  #print(maxheight)
+  #return
+  for (i in 1: nrow(dataset)) {
+    #print(i)
+    #print(nrow(matrix(t(dataset[i, -1]), nrow=28)))
+    #print(nrow(matrix(t(dataset[i, -1]), nrow=28)))
+    resize.matrix(dataset, i, matrix(t(dataset[i, -1]), nrow=28, byrow=T), 
+                  maxwidth, maxheight, borders[i], newtrain)
+  }
+  #ncol(dataset) <- maxwidth*maxheight+1
+  #print(sds)
+}
+trim.dataset(mnist.train, borders, newtrain)
+
+mnist.train<-as.data.frame(newtrain)
 mnist.train$y <- factor(mnist.train$y)
 
 deskew <- function(df, mincol=1, maxcol=ncol(df), threshold=1.10) {
@@ -45,7 +121,11 @@ deskew <- function(df, mincol=1, maxcol=ncol(df), threshold=1.10) {
   }
   df
 }
-
+pcalda <- function(...) pcawrap(lda, ...)
+predict.pcalda <- function(...) predict(...)$class
+show_digit <- function(arr784, col = gray(12:1/12), ...) {
+    image(matrix(arr784, nrow = maxheight)[, maxheight:1], col = col, ...)
+}
 
 #for (i in 1:nrow(mnist.train)) {
 #  r <- raster(matrix(t(mnist.train[i, -1]), nrow = 28))
@@ -66,11 +146,7 @@ deskew <- function(df, mincol=1, maxcol=ncol(df), threshold=1.10) {
 ```
 
 ```{r}
-pcalda <- function(...) pcawrap(lda, ...)
-predict.pcalda <- function(...) predict(...)$class
-show_digit <- function(arr784, col = gray(12:1/12), ...) {
-    image(matrix(arr784, nrow = 28)[, 28:1], col = col, ...)
-}
+
 show_digit(as.matrix(mnist.train[1, -1]), main = mnist.train[1, 1])
 show_digit(as.matrix(mnist.train[2, -1]), main = mnist.train[2, 1])
 show_digit(as.matrix(mnist.train[5, -1]), main = mnist.train[5, 1])
@@ -79,12 +155,12 @@ sds <- sapply(mnist.train, sd)
 zero.sd <- names(mnist.train)[sds < 2 ]
 mnist.train.nz <- mnist.train[, setdiff(names(mnist.train), zero.sd)]
 
-sds2 <- sapply(mnist.train.nz, sd)
-zero.sd2 <- names(mnist.train.nz)[sds2 < 2 ][-1]
-mnist.train.nz2 <- mnist.train.nz[, setdiff(names(mnist.train.nz), zero.sd2)]
-mnist.train.nz <- mnist.train.nz2 
-sapply(mnist.train.nz, sd)
-#mnist.train.nz <- deskew(mnist.train.nz, mincol=2)
+#sds2 <- sapply(mnist.train.nz, sd)
+#zero.sd2 <- names(mnist.train.nz)[sds2 < 2 ][-1]
+#mnist.train.nz2 <- mnist.train.nz[, setdiff(names(mnist.train.nz), zero.sd2)]
+#mnist.train.nz <- mnist.train.nz2 
+
+mnist.train.nz <- deskew(mnist.train.nz, mincol=2)
 
 #sds2 <- sapply(mnist.train.nz, sd)
 #zero.sd2 <- names(mnist.train.nz)[(sds2) <= 2]
@@ -111,15 +187,19 @@ tn.lda$best.model
 #mnist.train.nz<- deskew(mnist.train.nz, mincol=2)
 pcaqda <- function(...) pcawrap(qda, ...)
 predict.pcaqda <- function(...) predict(...)$class
-tn.qda <- tune(qda, y ~ ., data = mnist.train.nz,
+
+mnist.train.nz.jittered <- mnist.train.nz
+mnist.train.nz.jittered[, -1] <- apply(mnist.train.nz[, -1], 2, jitter)
+
+tn.qda <- tune(qda, y ~ ., data = mnist.train.nz.jittered,
                predict.func = predict.pcaqda,
                tunecontrol = tune.control(cross = 2))
 
 summary(tn.qda)
 
-tn.pcaqda <- tune(pcaqda, y ~ ., data = mnist.train.nz,
+tn.pcaqda <- tune(pcaqda, y ~ ., data = mnist.train,
                   scale = FALSE, center = TRUE,# ranges = list(ncomp = c(1, 10, 20, 40, 50)),
-                  ranges = list(ncomp = c(10, 30, 50, 70, 90)),
+                  ranges = list(ncomp = c(10, 30, 35, 40, 50, 70, 90)),
                   predict.func = predict.pcaqda,
                   tunecontrol = tune.control(cross = 2))
 summary(tn.pcaqda)
