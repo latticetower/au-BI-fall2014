@@ -29,13 +29,13 @@ train <- load_image_file2('mnist/train-data.changed')
 train$y <- load_label_file('mnist/train-labels.changed')
 train$cc <- load_label_file('mnist/train-data.connected.comp')
 
-mnist.train <-data.frame(y=train$y, c=train$cc, x=train$x)
+mnist.train <-data.frame(y=train$y, c=train$cc, x=train$x) #[1:1000,]
 
 test<- load_image_file2('mnist/test-data.changed')
 test$y <- load_label_file('mnist/test-labels.changed')
 test$cc <- load_label_file('mnist/test-data.connected.comp')
 
-mnist.test <- data.frame(y=test$y, c=test$cc, x=test$x)
+mnist.test <- data.frame(y=test$y, c=test$cc, x=test$x) #[1:1000,]
 
 maxwidth <- max(train$ncol, test$ncol)
 maxheight <- max(train$nrow, test$nrow)
@@ -103,7 +103,7 @@ mnist.train.nz <- mnist.train #[, setdiff(names(mnist.train), zero.sd)]
 #mnist.train.nz <- mnist.train.nz [, setdiff(names(mnist.train.nz), zero.sd2)]
 ```
 
-```{r}
+```{r eval=FALSE}
 #mnist.train.nz.jittered <- mnist.train.nz
 #mnist.train.nz.jittered[, -c(1,2)] <- apply(mnist.train.nz[, -c(1,2)], 2, jitter)
 
@@ -126,7 +126,8 @@ print(tt)
 pcaqda <- function(...) pcawrap(qda, ...)
 predict.pcaqda <- function(...) predict(...)$class
 
-
+```
+```{r eval=FALSE}
 
 tn.qda <- tune(qda, y ~ ., data = mnist.train.nz,
                predict.func = predict.pcaqda,
@@ -140,21 +141,52 @@ tt <- table(actual = mnist.test$y,
 print(tt)
 1 - sum(diag(tt)) / sum(tt)
 
+```
+```{r}
+conn.comps <- levels(factor(mnist.train.nz[,"c"]))
 
+pcaqda_array <- NULL
+#digits <- levels(factor(mnist.train.nz[mnist.train.nz[, "c"] == conn.comps[6], ][, 1]))
+#nrow(mnist.train.nz[ is.element(mnist.train.nz[, "y"], digits), ])
+for (i in 1 : length(conn.comps)) {
+  digits <- levels(factor(mnist.train.nz[mnist.train.nz[, "c"] == conn.comps[i], ][, 1]))
+  mnist.train.nz.filtered <- mnist.train.nz[ is.element(mnist.train.nz[, "y"], digits), ]
+  tn.pcaqda_temp <- tune(pcaqda, y ~ ., data = mnist.train.nz.filtered,
+                  scale = FALSE, center = TRUE,# ranges = list(ncomp = c(1, 10, 20, 40, 50)),
+                  ranges = list(ncomp = c(10, 30, 35, 40, 50, 70, 90)),
+                  predict.func = predict.pcaqda,
+                  tunecontrol = tune.control(cross = 2))
+  pcaqda_array <- cbind(pcaqda.array, tn.pcaqda_temp)
+
+}
 tn.pcaqda <- tune(pcaqda, y ~ ., data = mnist.train.nz,
                   scale = FALSE, center = TRUE,# ranges = list(ncomp = c(1, 10, 20, 40, 50)),
                   ranges = list(ncomp = c(10, 30, 35, 40, 50, 70, 90)),
                   predict.func = predict.pcaqda,
                   tunecontrol = tune.control(cross = 2))
-summary(tn.pcaqda)
 
-plot(tn.pcaqda)
+#summary(tn.pcaqda)
+#method returns set of predicted values for given input set
+predict.filtered <- function(mnist.test) {
+  test.set.conn <- levels(factor(mnist.test[, "c"]))
+  results <- vector(mode="integer", length = nrow(mnist.test))
+  for (i in 1: length(test.set.conn)) {
+    subset <- mnist.test[mnist.test[, "c"] == test.set.conn[i], ]
+    if (is.element(test.set.conn[i], conn.comps)) {
+      results[mnist.test[, "c"] == test.set.conn[i]] <- predict(pcaqda_array[i]$best.model, subset)$class
+    } else {
+      results[mnist.test[, "c"] == test.set.conn[i]] <- predict(tn.pcaqda$best.model, subset)$class
+    }
+  }
+  results
+}
+#plot(tn.pcaqda)
 
 table(actual = mnist.train$y,
-      predicted = predict(tn.pcaqda$best.model)$class)
+      predicted = predict.filtered(mnist.train))
 
 tt <- table(actual = mnist.test$y,
-            predicted = predict(tn.pcaqda$best.model, mnist.test)$class)
+            predicted = predict.filtered(mnist.test))
 print(tt)
 
 1 - sum(diag(tt)) / sum(tt)
