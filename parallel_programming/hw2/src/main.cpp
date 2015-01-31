@@ -51,14 +51,18 @@ bool parse_cmd_options(int argc, char*argv[], int & readers_count, int & writers
   return true;
 }
 
+/* operation_type == 1 if writer, otherwise 0 (reader)
+*/
 template <class ElementType>
-void write(SyncList<ElementType>* list) {
+void do_smth(SyncList<ElementType>* list, int operation_type) {
+  if (operation_type) {//write mode
+
+  }
+  else {//read mode
+
+  }
 }
 
-template <class ElementType>
-void read(SyncList<ElementType>* list) {
-
-}
 
 
 int main(int argc, char* argv[]) {
@@ -73,12 +77,8 @@ int main(int argc, char* argv[]) {
   } else {
     list = new LockableList<int>();
   }
-  for (int i = 0; i < rcount; i++) {
-    list_operators.add_thread(new boost::thread(read<int>, list));
-  }
-
-  for (int i = 0; i < wcount; i++) {
-    list_operators.add_thread(new boost::thread(write<int>, list));
+  for (int i = 0; i < rcount + wcount; i++) {
+    list_operators.add_thread(new boost::thread(do_smth<int>, list, i < wcount));
   }
   list_operators.join_all();
   /*}
