@@ -1,8 +1,10 @@
 #include <boost/program_options.hpp>
+#include <boost/algorithm/string.hpp>
 
 namespace po = boost::program_options;
 
 #include <iostream>
+#include <string>
 #include <iterator>
 #include "thread_pool.h"
 
@@ -27,24 +29,55 @@ bool parse_cmd_options(int argc, char*argv[], int & hot_threads_count, int & tim
     return 0;
   }
 
-  if (vm.count("hot_threads_count")) {
+  if (vm.count("hot_threads_count") && vm.count("timeout")) {
     hot_threads_count = vm["hot_threads_count"].as<int>();
-  }
-  else {
-    std::cout  << "hot threads count was not provided\n" << desc << "\n";
-    return false;
-  }
-
-  if (vm.count("timeout")) {
     timeout = vm["timeout"].as<int>();
   }
   else {
-    std::cout  << "timeout was not provided\n" << desc << "\n";
+    std::cout  << "some arguments were not provided\n" << desc << "\n";
     return false;
   }
+
   return true;
 }
 
+//helper method - for parsing line with new tasks
+void add_all_tasks(std::vector<std::string> const & tokens, ThreadPoolManager & pool_manager) {
+  if (tokens[0] == "add") {
+    //assume that 2nd and all next tokens are timeouts for new tasks
+    for (int i = 1; i < tokens.size(); i++) {
+      int timeout = stoi(tokens[i]);
+      if (timeout > 0) {
+        int task_id = pool_manager.add_task(timeout);
+        std::cout << "Added new task with id = " << task_id << std::endl;
+      }
+    }
+  }
+}
+
+//helper method - for parsing obsolete-and-should-be-removed tasks
+void remove_all_tasks(std::vector<std::string> const & tokens, ThreadPoolManager & pool_manager) {
+  if (tokens[0] == "remove") {
+    //assume that 2nd and all next tokens are task ids
+    for (int i = 1; i < tokens.size(); i++) {
+      int task_id = stoi(tokens[i]);
+      if (task_id > 0) {
+        pool_manager.remove_task(task_id);
+        std::cout << "Trying to remove task with id = " << task_id << std::endl;
+      }
+    }
+  }
+}
+
+//helper method to show help message about cmd options
+void show_help_in_cmdline(std::vector<std::string> const& tokens) {
+  if (tokens[0] == "help") {
+    std::cout << "commands:\n" <<
+        "\"add <time1> <time2> ...\" -  to add set of new tasks with given time intervals\n" <<
+        "\"remove <task_id1> <task_id2> ...\" -  to remove set of tasks with given ids\n" <<
+        "\"exit\" -  to exit\n";
+  }
+}
 
 int main(int argc, char* argv[]) {
     //try {
@@ -53,9 +86,20 @@ int main(int argc, char* argv[]) {
     ThreadPool pool(hot_threads_count, timeout);
     ThreadPoolManager pool_manager(pool);
     pool.set_manager(&pool_manager);
-    int task_id = pool_manager.add_task(2);
-    pool_manager.remove_task(task_id);
-
+    std::string input_str;
+    while (true) {
+        std::getline(std::cin, input_str);
+        std::vector<std::string> tokens;
+        boost::split(tokens, input_str, boost::is_any_of("\t "));
+        std::cout << tokens.size() << " " << tokens[0];
+        show_help_in_cmdline(tokens);
+        if (tokens.size() > 1) {
+          add_all_tasks(tokens, pool_manager);
+          remove_all_tasks(tokens, pool_manager);
+        } //else {/* do nothing */  }
+        if (tokens[0] == "exit")
+          break;
+    }
       /*}
       catch(std::exception& e) {
         std::cerr << "error: " << e.what() << "\n";
