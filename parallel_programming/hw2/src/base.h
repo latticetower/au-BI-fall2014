@@ -2,7 +2,7 @@
 
 template<class ElementType>
 struct Node {
-    Node(ElementType& element_, int key_, std::shared_ptr<Node<ElementType> > next_ = NULL)
+    Node(ElementType element_, int key_, std::shared_ptr<Node<ElementType> > next_ = NULL)
         : element(element_), key(key_), next(next_) {
     }
     Node() {

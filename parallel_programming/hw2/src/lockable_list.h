@@ -11,11 +11,7 @@ class LockableList: public SyncList<ElementType>{
     void insert(ElementType& element, int key) {
         boost::mutex::scoped_lock lock(mutex);
         //std::cout << "insert called\n";
-        if (head == NULL) {
-            head = std::make_shared<Node<ElementType> >(element, key);
-            return;
-        }
-        if (head->key > key) {
+        if (head == NULL || head->key > key) {
             head = std::make_shared<Node<ElementType> >(element, key, head);
             return;
         }
