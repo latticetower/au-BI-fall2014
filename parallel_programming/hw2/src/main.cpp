@@ -12,7 +12,7 @@ namespace po = boost::program_options;
 #include "lockable_list.h"
 #include "lock_free_list.h"
 
-std::atomic<long long> opcount;
+boost::atomic<long long> opcount;
 
 bool parse_cmd_options(int argc, char*argv[], int & readers_count, int & writers_count, long long &operations_count, int & list_type) {
   po::options_description desc("Allowed options");
@@ -60,7 +60,7 @@ bool parse_cmd_options(int argc, char*argv[], int & readers_count, int & writers
 template <class ElementType>
 void do_smth(std::shared_ptr<SyncList<ElementType> > list, int operation_type, int i) {
   if (operation_type) {//write mode
-    while (opcount.load(std::memory_order_consume) > 0) {
+    while (opcount.load() > 0) {
       opcount --;
       int value = rand() % 1000;
       bool optype = (rand() % 100) > 20;
@@ -77,7 +77,7 @@ void do_smth(std::shared_ptr<SyncList<ElementType> > list, int operation_type, i
     }
   }
   else {//read mode
-    while (opcount.load(std::memory_order_consume) > 0) {
+    while (opcount.load() > 0) {
       opcount --;
       int key_to_find = rand() % 1000;
       std::pair<bool, int> find_result = list->find(key_to_find);
