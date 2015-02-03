@@ -64,7 +64,7 @@ void do_smth(std::shared_ptr<SyncList<ElementType> > list, int operation_type, i
       opcount --;
       int value = rand() % 1000;
       bool optype = (rand() % 100) > 20;
-      std::cout << i <<  " ss2s\n";
+      std::cout <<"thread "<< i <<  " ss2s\n";
 
       // let's call add if given random number % 100 is greater than 20, else call erase
       if (optype) {
@@ -73,7 +73,7 @@ void do_smth(std::shared_ptr<SyncList<ElementType> > list, int operation_type, i
       else {
         list->erase(value);
       }
-      std::cout << i << " s3s\n";
+      std::cout << "thread "<< i << " s3s\n";
     }
   }
   else {//read mode
@@ -81,7 +81,7 @@ void do_smth(std::shared_ptr<SyncList<ElementType> > list, int operation_type, i
       opcount --;
       int key_to_find = rand() % 1000;
       std::pair<bool, int> find_result = list->find(key_to_find);
-      std::cout << i << " \n";
+      std::cout <<"thread " << i << " \n";
       //if (find_result->first) {
       //  std::cout << "smth was found\n";
       //}

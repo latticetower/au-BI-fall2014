@@ -10,6 +10,7 @@ class LockFreeList: public SyncList<ElementType> {
     typedef std::shared_ptr<MarkedAtomicNodeValue> MarkedAtomicNodePtr;
 
     LockFreeList() {
+      //std::cout<<"in construct "<<std::numeric_limits<int>::max()<<"\n" ;
         tail = std::make_shared<MarkedAtomicNodeValue>(
               ElementType(),
               std::numeric_limits<int>::max()
@@ -21,22 +22,36 @@ class LockFreeList: public SyncList<ElementType> {
     }
 
     void insert(ElementType& element, int key) {
-
+      std::cout <<"in insert\n";
         while (true) {
+          std::cout << "1 " << key << "\n";
             auto neighbours = find_pair(key);
+            std::cout << "2\n";
             auto pred = neighbours.first;
             auto curr = neighbours.second;
             if (curr->key() == key) {
                 return;//do nothing - maybe should update value instead
             } else {
-                MarkedAtomicNodePtr node(std::make_shared<MarkedAtomicNodeValue>(element, key, curr));
-                if (pred->next()->compareAndSet(curr, node)) return;
+                //std::cout <<"insertion\n";
+                MarkedAtomicNodePtr node = std::make_shared<MarkedAtomicNodeValue>(element, key, curr);
+                /*std::cout <<"insertion2\n";
+                if (pred == NULL)
+                  std::cout<<"pred = null\n";
+                if (pred->next() == NULL)
+                  std::cout<<"pred->NEXT = null\n";
+                  if (curr == NULL)
+                    std::cout<<"curr = null\n";
+                    if (node == NULL)
+                      std::cout<<"node = null\n";*/
+                if (pred->compareAndSet(curr, node)) return;
+                std::cout << "4\n";
             }
         }
 
     }
 
     void erase(int key) {
+        std::cout <<"in erase\n";
         while (true) {
             auto neighbours = find_pair(key);
             auto pred = neighbours.first;
@@ -54,6 +69,7 @@ class LockFreeList: public SyncList<ElementType> {
 
 
     std::pair<bool, ElementType> find(int key) {
+      std::cout << "in find\n";
         auto w = find_pair(key);
         return std::make_pair(w.second->key() == key, w.second->element());
     }
@@ -72,6 +88,7 @@ class LockFreeList: public SyncList<ElementType> {
   private:
     std::pair<MarkedAtomicNodePtr,
               MarkedAtomicNodePtr > find_pair(int key) {
+      std::cout << "find_pair " << key << "\n";
       //bool retry;
       while(true) {
         //retry = false;
