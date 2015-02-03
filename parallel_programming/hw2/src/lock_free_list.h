@@ -7,7 +7,7 @@ class LockFreeList: public SyncList<ElementType> {
   public:
 
     typedef MarkedAtomicNode<ElementType> MarkedAtomicNodeValue;
-    typedef boost::atomic<std::shared_ptr<MarkedAtomicNodeValue> > MarkedAtomicNodePtr;
+    typedef std::shared_ptr<MarkedAtomicNodeValue> MarkedAtomicNodePtr;
 
     LockFreeList() {
         tail = std::make_shared<MarkedAtomicNodeValue>(
@@ -16,35 +16,37 @@ class LockFreeList: public SyncList<ElementType> {
             );
         head = std::make_shared<MarkedAtomicNodeValue>(
               ElementType(),
-              std::numeric_limits<int>::min(), tail.load()
+              std::numeric_limits<int>::min(), tail
               );
     }
 
     void insert(ElementType& element, int key) {
+
         while (true) {
             auto neighbours = find_pair(key);
-            MarkedAtomicNodePtr& pred = *neighbours.first;
-            MarkedAtomicNodePtr& curr = *neighbours.second;
-            if (get_key(curr) == key) {
+            auto pred = neighbours.first;
+            auto curr = neighbours.second;
+            if (curr->key() == key) {
                 return;//do nothing - maybe should update value instead
             } else {
                 MarkedAtomicNodePtr node(std::make_shared<MarkedAtomicNodeValue>(element, key, curr.load()));
-                if (compareAndSet(get_ptr(pred)->next, curr, node)) return;
+                if (pred->next()->compareAndSet(curr, node)) return;
             }
         }
+
     }
 
     void erase(int key) {
         while (true) {
             auto neighbours = find_pair(key);
-            MarkedAtomicNodePtr& pred = *neighbours.first;
-            MarkedAtomicNodePtr& curr = *neighbours.second;
-            if (get_key(curr) != key) {
+            auto pred = neighbours.first;
+            auto curr = neighbours.second;
+            if (curr->key() != key) {
               return; //false;
             } else {
-                MarkedAtomicNodePtr& succ = get_ptr(curr)->next;
-                if (!compareAndSet(curr, succ, succ, false, true)) continue;// retry;
-                compareAndSet(pred, curr, succ);
+                MarkedAtomicNodePtr succ = curr->next();
+                if (!curr->compareAndSet(succ, succ, false, true)) continue;// retry;
+                pred->compareAndSet(curr, succ);
                 return ;//true;
             }
         }
@@ -53,7 +55,7 @@ class LockFreeList: public SyncList<ElementType> {
 
     std::pair<bool, ElementType> find(int key) {
         auto w = find_pair(key);
-        return std::make_pair(get_key(*w.second) == key, get_ptr(*w.second)->element);
+        return std::make_pair(w.second->key() == key, w.second->element());
     }
 
     ~LockFreeList() {    }
@@ -68,23 +70,24 @@ class LockFreeList: public SyncList<ElementType> {
     }
 
   private:
-    std::pair<MarkedAtomicNodePtr*,
-              MarkedAtomicNodePtr* > find_pair(int key) {
+    std::pair<MarkedAtomicNodePtr,
+              MarkedAtomicNodePtr > find_pair(int key) {
       //bool retry;
       while(true) {
         //retry = false;
-        MarkedAtomicNodePtr* pred = &head;
-        MarkedAtomicNodePtr* curr = &get_ptr(*pred)->next;
-        MarkedAtomicNodePtr* succ;
+        MarkedAtomicNodePtr pred = head;
+        MarkedAtomicNodePtr curr = pred->next();
+        MarkedAtomicNodePtr succ;
         bool marked = false;
         while (true) {
-          load_value(*curr, *succ, marked);
+          succ = curr->next();
+          marked = curr->marked();
           if (marked) { // Если curr логически удален
-              if (!compareAndSet(*pred, *curr, *succ))
+              if (!pred->compareAndSet(curr, succ))
                   break;
               curr = succ;
           } else {
-            if (get_key(*curr) >= key)
+            if (curr->key() >= key)
                 return std::make_pair(pred, curr);
             pred = curr;
             curr = succ;
