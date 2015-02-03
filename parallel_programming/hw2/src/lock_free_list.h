@@ -29,7 +29,7 @@ class LockFreeList: public SyncList<ElementType> {
             if (curr->key() == key) {
                 return;//do nothing - maybe should update value instead
             } else {
-                MarkedAtomicNodePtr node(std::make_shared<MarkedAtomicNodeValue>(element, key, curr.load()));
+                MarkedAtomicNodePtr node(std::make_shared<MarkedAtomicNodeValue>(element, key, curr));
                 if (pred->next()->compareAndSet(curr, node)) return;
             }
         }
