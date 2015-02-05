@@ -3,7 +3,7 @@ SRC_DIR=src/
 LIBRARIES=-lboost_program_options -lboost_system -lboost_filesystem -lboost_serialization -lboost_thread -lboost_atomic
 BUILD_DIR=obj
 EXECUTABLES=stack_lists
-FLAGS=-std=c++0x
+FLAGS=-std=c++0x -mcx16
 
 all: clean $(BUILD_DIR) $(EXECUTABLES)
 

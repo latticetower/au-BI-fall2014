@@ -8,11 +8,11 @@ class LockableList: public SyncList<ElementType>{
         head = NULL;
     }
 
-    void insert(ElementType& element, int key) {
+    void insert(ElementType& element, KeyType key) {
         boost::mutex::scoped_lock lock(mutex);
         //std::cout << "insert called\n";
         if (head == NULL || head->key > key) {
-            head = std::make_shared<Node<ElementType> >(element, key, head);
+            head = boost::shared_ptr<Node<ElementType> >(new Node<ElementType>(element, key, head));
             return;
         }
         auto list_iterator = head;
@@ -26,11 +26,12 @@ class LockableList: public SyncList<ElementType>{
             list_iterator->element = element;
             return;
         }
-        list_iterator->next = std::make_shared<Node<ElementType> >(element, key, list_iterator->next);
+        list_iterator->next = boost::shared_ptr<Node<ElementType> >(
+            new Node<ElementType>(element, key, list_iterator->next));
     }
 
 
-    void erase(int key) {
+    void erase(KeyType key) {
         boost::mutex::scoped_lock lock(mutex);
         //std::cout << "erase called\n";
         if (head == NULL)
@@ -48,7 +49,7 @@ class LockableList: public SyncList<ElementType>{
         }
     }
 
-    std::pair<bool, ElementType> find(int key) {
+    std::pair<bool, ElementType> find(KeyType key) {
         boost::mutex::scoped_lock lock(mutex);
         //std::cout << "find called\n";
 
@@ -75,6 +76,6 @@ class LockableList: public SyncList<ElementType>{
 
     ~LockableList() {   }
   private:
-    std::shared_ptr<Node<ElementType> > head;
+    boost::shared_ptr<Node<ElementType> > head;
     boost::mutex mutex;
 };

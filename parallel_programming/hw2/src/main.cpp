@@ -58,30 +58,31 @@ bool parse_cmd_options(int argc, char*argv[], int & readers_count, int & writers
 /* operation_type == 1 if writer, otherwise 0 (reader)
 */
 template <class ElementType>
-void do_smth(std::shared_ptr<SyncList<ElementType> > list, int operation_type, int i) {
+void do_smth(boost::shared_ptr<SyncList<ElementType> > list, int operation_type, int i) {
   if (operation_type) {//write mode
     while (opcount.load() > 0) {
       opcount --;
       int value = rand() % 1000;
+      KeyType key = (KeyType)value;
       bool optype = (rand() % 100) > 20;
-      std::cout <<"thread "<< i <<  " ss2s\n";
+      //std::cout <<"thread "<< i <<  " ss2s\n";
 
       // let's call add if given random number % 100 is greater than 20, else call erase
       if (optype) {
-        list->insert(value, value);
+        list->insert(value, key);
       }
       else {
-        list->erase(value);
+        list->erase(key);
       }
-      std::cout << "thread "<< i << " s3s\n";
+      std::cout << "thread "<< i << "\n";
     }
   }
   else {//read mode
     while (opcount.load() > 0) {
       opcount --;
-      int key_to_find = rand() % 1000;
+      KeyType key_to_find = rand() % 1000;
       std::pair<bool, int> find_result = list->find(key_to_find);
-      std::cout <<"thread " << i << " \n";
+      std::cout << "thread " << i << " \n";
       //if (find_result->first) {
       //  std::cout << "smth was found\n";
       //}
@@ -102,11 +103,11 @@ int main(int argc, char* argv[]) {
     opcount = operations_count;
     //std::cout << rcount <<" "<< wcount <<" "<< opcount << " "<< list_type;
     boost::thread_group list_operators;
-    std::shared_ptr<SyncList<int> > list;
+    boost::shared_ptr<SyncList<int> > list;
     if (list_type) {
-        list = std::make_shared<LockFreeList<int> >();
+        list = boost::shared_ptr<LockFreeList<int> >(new LockFreeList<int>());
     } else {
-        list = std::make_shared<LockableList<int> >();
+        list = boost::shared_ptr<LockableList<int> >(new LockableList<int>());
     }
     for (int i = 0; i < rcount + wcount; i++) {
         list_operators.add_thread(new boost::thread(do_smth<int>, list, i < wcount, i));
