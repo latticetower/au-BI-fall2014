@@ -21,7 +21,7 @@ bool parse_cmd_options(int argc, char*argv[], int & readers_count, int & writers
   ("readers_count", po::value <int> (), "number of reader threads")
   ("writers_count", po::value <int>(), "number of writer threads")
   ("operations_count", po::value <long long>(), "number of operations")
-  ("list_type", po::value <int>(), "list type (0 -locking, otherwise - lock-free)")
+  ("list_type", po::value <int>(), "list type (0 -locking, 1 - lock-free)")
   ;
   po::positional_options_description p;
   p.add("readers_count", 1);
@@ -65,7 +65,6 @@ void do_smth(boost::shared_ptr<SyncList<ElementType> > list, int operation_type,
       int value = rand() % 1000;
       KeyType key = (KeyType)value;
       bool optype = (rand() % 100) > 20;
-      //std::cout <<"thread "<< i <<  " ss2s\n";
 
       // let's call add if given random number % 100 is greater than 20, else call erase
       if (optype) {
@@ -95,13 +94,11 @@ void do_smth(boost::shared_ptr<SyncList<ElementType> > list, int operation_type,
 int main(int argc, char* argv[]) {
     srand(time(NULL));
 
-    //try {
     int rcount, wcount, list_type;
     long long operations_count;
 
     if (!parse_cmd_options(argc, argv, rcount, wcount, operations_count, list_type)) return 1;
     opcount = operations_count;
-    //std::cout << rcount <<" "<< wcount <<" "<< opcount << " "<< list_type;
     boost::thread_group list_operators;
     boost::shared_ptr<SyncList<int> > list;
     if (list_type) {
@@ -113,16 +110,6 @@ int main(int argc, char* argv[]) {
         list_operators.add_thread(new boost::thread(do_smth<int>, list, i < wcount, i));
     }
     list_operators.join_all();
-
-    //list->print(std::cout);
-    /*}
-    catch(std::exception& e) {
-    std::cerr << "error: " << e.what() << "\n";
-    return 1;
-    }
-    catch(...) {
-    std::cerr << "Exception of unknown type!\n";
-    }*/
 
     return 0;
 }

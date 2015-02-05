@@ -70,7 +70,7 @@ class LockableList: public SyncList<ElementType>{
         for (auto list_iterator = head; list_iterator != NULL; list_iterator = list_iterator->next) {
             os << list_iterator->key << " ";
         }
-        os <<"end of contents\n";
+        os << "end of contents\n";
     }
 
 
