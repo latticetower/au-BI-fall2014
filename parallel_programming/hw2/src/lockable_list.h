@@ -5,77 +5,79 @@ template<class ElementType>
 class LockableList: public SyncList<ElementType>{
   public:
     LockableList() {
-        head = NULL;
+        auto tail = boost::shared_ptr<Node<ElementType> >(new Node<ElementType>(ElementType(),
+            std::numeric_limits<KeyType>::max()));
+        head = boost::shared_ptr<Node<ElementType> >(new Node<ElementType>(ElementType(),
+            std::numeric_limits<KeyType>::min(), tail));
     }
 
-    void insert(ElementType& element, KeyType key) {
-        boost::mutex::scoped_lock lock(mutex);
-        //std::cout << "insert called\n";
-        if (head == NULL || head->key > key) {
-            head = boost::shared_ptr<Node<ElementType> >(new Node<ElementType>(element, key, head));
-            return;
+    void insert(ElementType & element, KeyType key) {
+        boost::shared_ptr<Node<ElementType> > pred = head;
+        pred->lock();
+        boost::shared_ptr<Node<ElementType> > curr = head->next;
+        curr->lock();
+        while (curr->key < key) {
+          pred->unlock();
+          pred = curr;
+          curr = curr->next;
+          curr->lock();
         }
-        auto list_iterator = head;
-        for (; list_iterator != NULL; list_iterator = list_iterator->next) {
-            if (list_iterator->key >= key)
-                break;
+        if (curr->key == key) {
+          curr->unlock();
+          pred->unlock();
+          return;
+        } else {
+          pred->next = boost::shared_ptr<Node<ElementType> >(new Node<ElementType>(element, key, curr));
+          curr->unlock();
+          pred->unlock();
+          return;
         }
-        if (list_iterator == NULL)
-            return;
-        if (list_iterator->key == key) {
-            list_iterator->element = element;
-            return;
-        }
-        list_iterator->next = boost::shared_ptr<Node<ElementType> >(
-            new Node<ElementType>(element, key, list_iterator->next));
     }
 
 
     void erase(KeyType key) {
-        boost::mutex::scoped_lock lock(mutex);
-        //std::cout << "erase called\n";
-        if (head == NULL)
-            return;
-        if (head->key > key)
-            return;
-        if (head->key == key) {
-            head = head->next;
+        boost::shared_ptr<Node<ElementType> > pred = head;
+        pred->lock();
+        boost::shared_ptr<Node<ElementType> > curr = head->next;
+        curr->lock();
+        while (curr->key < key) {
+            pred->unlock();
+            pred = curr;
+            curr = curr->next;
+            curr->lock();
         }
-        for (auto list_iterator = head; list_iterator->next != NULL; list_iterator = list_iterator->next) {
-            if (list_iterator->next->key == key) {
-                list_iterator->next = list_iterator->next->next;
-            }
-            if (list_iterator->next->key > key) break;
+        if (curr->key != key) {
+            curr->unlock();
+            pred->unlock();
+            return;
+        } else {
+            curr->next->lock();
+            pred->next = curr->next;
+            pred->next->unlock();
+            curr->unlock();
+            pred->unlock();
+          return;
         }
     }
 
     std::pair<bool, ElementType> find(KeyType key) {
-        boost::mutex::scoped_lock lock(mutex);
-        //std::cout << "find called\n";
-
-        for (auto list_iterator = head; list_iterator != NULL; list_iterator = list_iterator->next) {
-            if (list_iterator->key == key)
-                return std::make_pair(true, list_iterator->element);
-            if (list_iterator->key > key)
-                break;
+        boost::shared_ptr<Node<ElementType> > pred = head;
+        pred->lock();
+        boost::shared_ptr<Node<ElementType> > curr = head->next;
+        curr->lock();
+        while (curr->key < key) {
+            pred->unlock();
+            pred = curr;
+            curr = curr->next;
+            curr->lock();
         }
-        return std::make_pair(false, ElementType());
+        auto result = std::make_pair(curr->key == key, curr->element);
+        curr->unlock();
+        pred->unlock();
+        return result;
     }
-
-    /*debug method*/
-    void print(std::ostream& os) {
-        boost::mutex::scoped_lock lock(mutex);
-
-        os << "prints list contents\n";
-        for (auto list_iterator = head; list_iterator != NULL; list_iterator = list_iterator->next) {
-            os << list_iterator->key << " ";
-        }
-        os << "end of contents\n";
-    }
-
 
     ~LockableList() {   }
   private:
     boost::shared_ptr<Node<ElementType> > head;
-    boost::mutex mutex;
 };
