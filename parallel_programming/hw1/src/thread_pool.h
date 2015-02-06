@@ -1,9 +1,8 @@
 #pragma once
-#include <boost/asio/io_service.hpp>
-#include <boost/bind.hpp>
-#include <boost/thread/thread.hpp>
-
-class ThreadPoolManager;
+#include "headers.h"
+#include "task_performer.h"
+#include "user_task.h"
+#include "task_queue.h"
 
 class ThreadPool{
   public:
@@ -26,12 +25,15 @@ class ThreadPool{
         stop();
         wait_all();
       }
-      void set_manager(ThreadPoolManager * manager) {
 
+      void add_task(int task_id) {
+        //io_service.post(boost::bind(&UserTask::run, fr));
+        task_queue.add_task(task_id);
       }
 
-      void addTask(int task_id) {
+      void remove_task(int task_id) {
         //io_service.post(boost::bind(&UserTask::run, fr));
+        //task_queue.add_task(task_id);
       }
 
   private:
@@ -39,41 +41,6 @@ class ThreadPool{
     boost::thread_group thread_group;
     std::unique_ptr<boost::asio::io_service::work> work;
     size_t hot_threads;
-    ThreadPoolManager * manager_;
-};
+    TaskQueue<UserTask> task_queue;
 
-class UserTask {
-  public:
-    UserTask(int duration): _duration(duration) {
-    }
-
-    // method performs user task
-    void run() {
-      //thread_pool.add_task(this, root_folder_path);
-      //thread_pool.wait_all();
-    }
-
-  private:
-    int _duration;
-};
-
-class ThreadPoolManager {
-  public:
-    ThreadPoolManager(ThreadPool & pool ): thread_pool(pool) {
-
-    }
-
-    int add_task(int duration) {
-      UserTask task(duration);
-      task_list.push_back(task);
-      thread_pool.addTask(duration);
-      //thread_pool.wait_all();
-      return 1;
-    }
-    void remove_task(int task_id) {
-
-    }
-  public:
-    ThreadPool & thread_pool;
-    std::vector<UserTask> task_list;
 };

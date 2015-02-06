@@ -1,11 +1,4 @@
-#include <boost/program_options.hpp>
-#include <boost/algorithm/string.hpp>
 
-namespace po = boost::program_options;
-
-#include <iostream>
-#include <string>
-#include <iterator>
 #include "thread_pool.h"
 
 
@@ -42,27 +35,28 @@ bool parse_cmd_options(int argc, char*argv[], int & hot_threads_count, int & tim
 }
 
 //helper method - for parsing line with new tasks
-void add_all_tasks(std::vector<std::string> const & tokens, ThreadPoolManager & pool_manager) {
+void add_all_tasks(std::vector<std::string> const & tokens, ThreadPool & pool) {
   if (tokens[0] == "add") {
     //assume that 2nd and all next tokens are timeouts for new tasks
     for (int i = 1; i < tokens.size(); i++) {
       int timeout = stoi(tokens[i]);
       if (timeout > 0) {
-        int task_id = pool_manager.add_task(timeout);
-        std::cout << "Added new task with id = " << task_id << std::endl;
+        //int task_id =
+        pool.add_task(timeout);
+        //std::cout << "Added new task with id = " << task_id << std::endl;
       }
     }
   }
 }
 
 //helper method - for parsing obsolete-and-should-be-removed tasks
-void remove_all_tasks(std::vector<std::string> const & tokens, ThreadPoolManager & pool_manager) {
+void remove_all_tasks(std::vector<std::string> const & tokens, ThreadPool & pool) {
   if (tokens[0] == "remove") {
     //assume that 2nd and all next tokens are task ids
     for (int i = 1; i < tokens.size(); i++) {
       int task_id = stoi(tokens[i]);
       if (task_id > 0) {
-        pool_manager.remove_task(task_id);
+        pool.remove_task(task_id);
         std::cout << "Trying to remove task with id = " << task_id << std::endl;
       }
     }
@@ -84,8 +78,6 @@ int main(int argc, char* argv[]) {
     int hot_threads_count,  timeout;
     if (!parse_cmd_options(argc, argv, hot_threads_count, timeout)) return 1;
     ThreadPool pool(hot_threads_count, timeout);
-    ThreadPoolManager pool_manager(pool);
-    pool.set_manager(&pool_manager);
     std::string input_str;
     while (true) {
         std::getline(std::cin, input_str);
@@ -94,8 +86,8 @@ int main(int argc, char* argv[]) {
         std::cout << tokens.size() << " " << tokens[0];
         show_help_in_cmdline(tokens);
         if (tokens.size() > 1) {
-          add_all_tasks(tokens, pool_manager);
-          remove_all_tasks(tokens, pool_manager);
+          add_all_tasks(tokens, pool);
+          remove_all_tasks(tokens, pool);
         } //else {/* do nothing */  }
         if (tokens[0] == "exit")
           break;
