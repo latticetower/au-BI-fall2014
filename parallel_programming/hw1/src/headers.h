@@ -9,7 +9,9 @@ namespace po = boost::program_options;
 #include <string>
 #include <iterator>
 #include <queue>
+#include <map>
 
 #include <boost/asio/io_service.hpp>
 #include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
+#include <boost/atomic.hpp>
