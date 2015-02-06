@@ -21,7 +21,7 @@ public:
 
     while (task_list.size() == 0) {
       if (timeout > 0) {
-        bool wait_result = task_condition.timed_wait(lock, boost::posix_time::milliseconds(timeout));
+        bool wait_result = task_condition.timed_wait(lock, boost::posix_time::seconds(timeout));
         if (!wait_result) return std::make_pair(false, nullptr);
       } else {
         task_condition.wait(lock);

@@ -15,3 +15,5 @@ namespace po = boost::program_options;
 #include <boost/bind.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/atomic.hpp>
+
+#include <signal.h>
