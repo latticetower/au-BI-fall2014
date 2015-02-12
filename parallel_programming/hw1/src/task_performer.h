@@ -25,12 +25,16 @@ class TaskPerformer{
     }
 
     void operator()() {
-        if(owner == NULL) {
+        if (owner == NULL) {
+            io_mutex.lock();
             std::cout << "no ThreadPool obj provided, TaskPerformer " << id << " exists\n";
+            io_mutex.unlock();
             return;
         }
 
+        io_mutex.lock();
         std::cout << "Starting TaskPerformer " << id << ", with timeout = " << timeout << "\n";
+        io_mutex.unlock();
         while(true) {
             owner->inc_free_threads();
             std::pair<bool, UserTask* > task_info = owner->get_queue().get_task(timeout);
@@ -44,7 +48,9 @@ class TaskPerformer{
             if (owner->received_kill_signal()) break;
             boost::this_thread::yield();
         }
+        io_mutex.lock();
         std::cout << "TaskPerformer " << id << " with timeout " << timeout << " stopped "  << "\n";
+        io_mutex.unlock();
     }
 
 

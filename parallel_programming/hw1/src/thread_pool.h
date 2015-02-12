@@ -22,6 +22,7 @@ class ThreadPool{
     void stop() {
         remove_all_tasks();
         kill_signal.store(true);
+
     }
 
     void wait_all() {
@@ -30,6 +31,7 @@ class ThreadPool{
 
     ~ThreadPool() {
         stop();
+        thread_group.interrupt_all();
         wait_all();
     }
 
@@ -38,9 +40,11 @@ class ThreadPool{
 
         int new_key = get_max_key() + 1;
         all_tasks.insert(std::make_pair(new_key, UserTask(new_key, task_duration)));
-        task_queue.add_task(&all_tasks[new_key]);
+        task_queue.add_task(&all_tasks[new_key], new_key);
         if (free_threads_count.load() == 0) {
+            io_mutex.lock();
             std::cout << "Adding temporary cold thread with timeout " << " " << timeout << "\n";
+            io_mutex.unlock();
             thread_count ++;
             TaskPerformer<ThreadPool> performer(this, timeout, thread_count);
             thread_group.create_thread(performer);
@@ -78,7 +82,7 @@ class ThreadPool{
         --free_threads_count;
     }
     bool received_kill_signal() {
-      return kill_signal.load();
+        return kill_signal.load();
     }
 
   private:

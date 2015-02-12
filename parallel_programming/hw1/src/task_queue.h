@@ -8,9 +8,11 @@ public:
 
   }
 
-  void add_task(UserTask * task) {
+  void add_task(UserTask * task, int key) {
     boost::unique_lock<boost::mutex> lock(mutex_);
-    std::cout <<"add task to queue\n";
+    io_mutex.lock();
+    std::cout << "add task " << key << " to queue\n";
+    io_mutex.unlock();
     task_list.push(task);
     task_condition.notify_one();
   }

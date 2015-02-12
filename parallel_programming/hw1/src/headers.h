@@ -17,3 +17,5 @@ namespace po = boost::program_options;
 #include <boost/atomic.hpp>
 
 #include <signal.h>
+
+boost::mutex io_mutex;

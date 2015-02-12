@@ -18,7 +18,9 @@ bool parse_cmd_options(int argc, char*argv[], int & hot_threads_count, int & tim
   po::notify(vm);
 
   if (vm.count("help")) {
+    io_mutex.lock();
     std::cout << desc << "\n";
+    io_mutex.unlock();
     return 0;
   }
 
@@ -27,7 +29,9 @@ bool parse_cmd_options(int argc, char*argv[], int & hot_threads_count, int & tim
     timeout = vm["timeout"].as<int>();
   }
   else {
+    io_mutex.lock();
     std::cout  << "some arguments were not provided\n" << desc << "\n";
+    io_mutex.unlock();
     return false;
   }
 
@@ -56,7 +60,9 @@ void remove_all_tasks(std::vector<std::string> const & tokens, ThreadPool & pool
             int task_id = stoi(tokens[i]);
             if (task_id > 0) {
                 pool.remove_task(task_id);
+                io_mutex.lock();
                 std::cout << "Trying to remove task with id = " << task_id << std::endl;
+                io_mutex.unlock();
             }
         }
     }
@@ -65,14 +71,18 @@ void remove_all_tasks(std::vector<std::string> const & tokens, ThreadPool & pool
 //helper method to show help message about cmd options
 void show_help_in_cmdline(std::vector<std::string> const& tokens) {
     if (tokens[0] == "help") {
+      io_mutex.lock();
       std::cout << "commands:\n" <<
           "\"add <time1> <time2> ...\" -  to add set of new tasks with given time intervals\n" <<
           "\"remove <task_id1> <task_id2> ...\" -  to remove set of tasks with given ids\n" <<
           "\"exit\" -  to exit\n";
+      io_mutex.unlock();
     }
 }
 void signal_callback_handler(int signum) {
+    io_mutex.lock();
     std::cout << "Interrupted, closing...\n ";
+    io_mutex.unlock();
     exit(signum);
 }
 
@@ -86,18 +96,23 @@ int main(int argc, char* argv[]) {
     ThreadPool pool(hot_threads_count, timeout);
     std::string input_str;
     while (true) {
+        io_mutex.lock();
         std::getline(std::cin, input_str);
+        io_mutex.unlock();
         std::vector<std::string> tokens;
         boost::split(tokens, input_str, boost::is_any_of("\t "));
         show_help_in_cmdline(tokens);
         if (tokens.size() > 1) {
-          add_all_tasks(tokens, pool);
-          remove_all_tasks(tokens, pool);
+            add_all_tasks(tokens, pool);
+            remove_all_tasks(tokens, pool);
         } //else {/* do nothing */  }
         if (tokens[0] == "exit")
             break;
     }
+    pool.stop();
+    io_mutex.lock();
     std::cout << "Got exit signal\n";
+    io_mutex.unlock();
       /*}
       catch(std::exception& e) {
         std::cerr << "error: " << e.what() << "\n";
